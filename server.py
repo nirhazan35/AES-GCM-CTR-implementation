@@ -64,11 +64,12 @@ while True:
 
                 if recipient_name in client_dict:
                     # Encrypt the message again before sending to the recipient
+                    sender_name = str(get_key(addr))
                     recipient_addr = client_dict[recipient_name]
                     new_iv = os.urandom(16)  # Generate a new IV for this transmission
-                    encrypted_message, new_auth_tag = aes_gcm.encrypt(
-                        message.encode(), associated_data, new_iv
-                    )
+                    sender_and_message = sender_name + "|" + message
+                    sender_and_message = sender_and_message.encode()
+                    encrypted_message, new_auth_tag = aes_gcm.encrypt(sender_and_message, associated_data, new_iv)
                     sock.sendto(encrypted_message + b'|$' + new_iv + b'|$' + new_auth_tag, recipient_addr)
                 else:
                     # Notify the sender that the recipient does not exist

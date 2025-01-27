@@ -48,7 +48,9 @@ def output_recvfrom(sock):
             print("Received message from server")
             ciphertext, iv, auth_tag = data.split(b'|$')  # Split received data
             plaintext = aes_gcm.decrypt(ciphertext, associated_data, iv, auth_tag)
-            print(f"Message: {plaintext.decode()}")
+            plaintext = plaintext.decode()
+            recipient_name, message = plaintext.split("|", 1)
+            print(f"{recipient_name}: {message}")
         except Exception as e:
             print(f"Failed to decrypt message: {e}")
 
