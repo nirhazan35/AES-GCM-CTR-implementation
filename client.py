@@ -46,9 +46,9 @@ def output_recvfrom(sock):
 
         try:
             print("Received message from server")
-            ciphertext, iv, auth_tag = data.split(b'|')  # Split received data
+            ciphertext, iv, auth_tag = data.split(b'|$')  # Split received data
             plaintext = aes_gcm.decrypt(ciphertext, associated_data, iv, auth_tag)
-            print(plaintext.decode())
+            print(f"Message: {plaintext.decode()}")
         except Exception as e:
             print(f"Failed to decrypt message: {e}")
 
@@ -63,8 +63,7 @@ for line in sys.stdin:
     ciphertext, auth_tag = aes_gcm.encrypt(recipient_and_message.encode(), associated_data, iv)
 
     # Send the encrypted message in the format: ciphertext|iv|auth_tag
-    data = ciphertext + b'|' + iv + b'|' + auth_tag
-    print("data", data)
+    data = ciphertext + b'|$' + iv + b'|$' + auth_tag
     sock.sendto(data, server_addr)
 
 sock.close()

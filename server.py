@@ -49,11 +49,10 @@ while True:
             print(f"Received message from {get_key(addr)}")
             
             # Validate and split data
-            print("data", data)
-            if data.count(b'|') != 2:
+            if data.count(b'|$') != 2:
                 raise ValueError("Invalid message format. Expected ciphertext|iv|auth_tag.")
             
-            ciphertext, iv, auth_tag = data.split(b'|')  # Split data into components
+            ciphertext, iv, auth_tag = data.split(b'|$')  # Split data into components
             
             # Decrypt the incoming data
             plaintext = aes_gcm.decrypt(ciphertext, associated_data, iv, auth_tag)
@@ -70,20 +69,20 @@ while True:
                     encrypted_message, new_auth_tag = aes_gcm.encrypt(
                         message.encode(), associated_data, new_iv
                     )
-                    sock.sendto(encrypted_message + b'|' + new_iv + b'|' + new_auth_tag, recipient_addr)
+                    sock.sendto(encrypted_message + b'|$' + new_iv + b'|$' + new_auth_tag, recipient_addr)
                 else:
                     # Notify the sender that the recipient does not exist
                     error_message = "Recipient not found."
                     encrypted_error, error_tag = aes_gcm.encrypt(
                         error_message.encode(), associated_data, os.urandom(16)
                     )
-                    sock.sendto(encrypted_error + b'|' + error_tag, addr)
+                    sock.sendto(encrypted_error + b'|$' + error_tag, addr)
             else:
                 # Notify the sender of incorrect message format
                 error_message = "Invalid message format. Use: recipient_name|message"
                 encrypted_error, error_tag = aes_gcm.encrypt(
                     error_message.encode(), associated_data, os.urandom(16)
                 )
-                sock.sendto(encrypted_error + b'|' + error_tag, addr)
+                sock.sendto(encrypted_error + b'|$' + error_tag, addr)
         except Exception as e:
             print(f"Error handling message from {addr}: {e}")
