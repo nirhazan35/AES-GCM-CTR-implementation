@@ -7,9 +7,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Retrieve AES key and convert it to bytes
-aes_key = b'T\xf8p\xcb\xc1n\xd6\xa1}\x93\x1f\x94\x9d\xd7\xb7\xe6yT\r\xe4\xb0\x8b\x8b\xd00\x00\xdd<\xb2\xba\xe2\xf3'
-if aes_key is None:
-    raise ValueError("AES_KEY not found in the environment. Add it to the .env file.")
+aes_key = b'T\xf8p\xcb\xc1n\xd6\xa1}\x93\x1f\x94\x9d\xd7\xb7\xe6yT\r\xe4\xb0\x8b\x8b\xd00\x00\xdd<\xb2\xba\xe2\xf3' # fix to load from env file @@@@@@@@@@@@@@@@@@@@
+# if aes_key is None:
+#     raise ValueError("AES_KEY not found in the environment. Add it to the .env file.")
 
 # try:
 #     aes_key = bytes.fromhex(aes_key)  # Convert the hex key to bytes
