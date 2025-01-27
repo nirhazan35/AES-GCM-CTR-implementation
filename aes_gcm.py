@@ -1,6 +1,6 @@
 import os
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from cryptography.hazmat.primitives.hashes import Hash, SHA256
+from cryptography.hazmat.primitives.hashes import SHA256
 from cryptography.hazmat.primitives.hmac import HMAC
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.padding import PKCS7
