@@ -21,5 +21,17 @@ class TestAESGCM(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.aes_gcm.decrypt(ciphertext, self.associated_data, self.iv, invalid_auth_tag)
 
+    def test_invalid_iv(self):
+        with self.assertRaises(ValueError):
+            self.aes_gcm.encrypt(self.plaintext, self.associated_data, b"short_iv")
+
+    def test_empty_plaintext(self):
+        with self.assertRaises(ValueError):
+            self.aes_gcm.encrypt(b"", self.associated_data, self.iv)
+
+    def test_empty_associated_data(self):
+        with self.assertRaises(ValueError):
+            self.aes_gcm.encrypt(self.plaintext, b"", self.iv)
+
 if __name__ == "__main__":
     unittest.main()

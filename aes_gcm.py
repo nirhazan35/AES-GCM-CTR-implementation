@@ -7,9 +7,18 @@ from cryptography.hazmat.primitives.padding import PKCS7
 
 class AESGCM:
     def __init__(self, key):
+        if len(key) not in (16, 24, 32):
+            raise ValueError("Invalid key length: key must be 128, 192, or 256 bits.")
         self.key = key
 
     def encrypt(self, plaintext, associated_data, iv):
+        if not plaintext:
+            raise ValueError("Plaintext cannot be empty.")
+        if not associated_data:
+            raise ValueError("Associated data cannot be empty.")
+        if len(iv) != 16:
+            raise ValueError("IV must be 128 bits (16 bytes).")
+
         # Pad the plaintext to block size
         padder = PKCS7(128).padder()
         padded_plaintext = padder.update(plaintext) + padder.finalize()
@@ -26,6 +35,15 @@ class AESGCM:
         return ciphertext, auth_tag
 
     def decrypt(self, ciphertext, associated_data, iv, auth_tag):
+        if not ciphertext:
+            raise ValueError("Ciphertext cannot be empty.")
+        if not associated_data:
+            raise ValueError("Associated data cannot be empty.")
+        if len(iv) != 16:
+            raise ValueError("IV must be 128 bits (16 bytes).")
+        if not auth_tag:
+            raise ValueError("Authentication tag cannot be empty.")
+
         # Verify the authentication tag
         if not self._verify_auth_tag(associated_data, iv, ciphertext, auth_tag):
             raise ValueError("Invalid authentication tag!")
@@ -62,3 +80,4 @@ class AESGCM:
             return True
         except Exception:
             return False
+
