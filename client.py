@@ -13,12 +13,6 @@ aes_key = b'T\xf8p\xcb\xc1n\xd6\xa1}\x93\x1f\x94\x9d\xd7\xb7\xe6yT\r\xe4\xb0\x8b
 if aes_key is None:
     raise ValueError("AES_KEY not found in the environment. Add it to the .env file.")
 
-# Convert the key from hex to bytes
-# try:
-#     aes_key = bytes.fromhex(aes_key)  # Convert the hex key to bytes
-# except ValueError:
-#     raise ValueError("AES_KEY is not a valid hexadecimal string.")
-
 # Ensure the key is 128, 192, or 256 bits
 if len(aes_key) not in (16, 24, 32):
     raise ValueError("Invalid key length: key must be 128, 192, or 256 bits.")
