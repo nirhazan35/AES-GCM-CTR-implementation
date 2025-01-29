@@ -5,62 +5,53 @@ import os
 from aes_gcm import AESGCM
 from dotenv import load_dotenv
 
-# Load environment variables
 load_dotenv()
 
-# Retrieve and process the AES key
+# AES Key Configuration
 aes_key = b'T\xf8p\xcb\xc1n\xd6\xa1}\x93\x1f\x94\x9d\xd7\xb7\xe6yT\r\xe4\xb0\x8b\x8b\xd00\x00\xdd<\xb2\xba\xe2\xf3'
-if aes_key is None:
-    raise ValueError("AES_KEY not found in the environment. Add it to the .env file.")
-
-# Ensure the key is 128, 192, or 256 bits
 if len(aes_key) not in (16, 24, 32):
-    raise ValueError("Invalid key length: key must be 128, 192, or 256 bits.")
+    raise ValueError("Invalid AES key length")
 
-# Client configuration
-server_addr = ('127.0.0.1', 9999)
-sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
-
-associated_data = b"authenticated-data"
-
-# Initialize AESGCM
+# Network Configuration
+SERVER_ADDR = ('127.0.0.1', 9999)
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+ASSOCIATED_DATA = b"authenticated-data"
 aes_gcm = AESGCM(aes_key)
 
-# Enter the client's username
-my_name = input('Enter your name: ')
-sock.sendto(my_name.encode(), server_addr)
+# Check if running inside pytest
+if "PYTEST_RUNNING" in os.environ:
+    my_name = "TestClient"
+else:
+    my_name = input("Enter your name: ")
+sock.sendto(my_name.encode(), SERVER_ADDR)
 
-# Thread to listen for messages from the server
 def output_recvfrom(sock):
     while True:
-        data = None
-        data, _ = sock.recvfrom(2048)
-        if not data:
-            break
-
         try:
-            print("Received message from server")
-            ciphertext, iv, auth_tag = data.split(b'|$')  # Split received data
-            plaintext = aes_gcm.decrypt(ciphertext, associated_data, iv, auth_tag)
-            plaintext = plaintext.decode()
-            recipient_name, message = plaintext.split("|", 1)
-            print(f"{recipient_name}: {message}")
+            data, _ = sock.recvfrom(4096)
+            if not data:
+                break
+            parts = data.split(b'|$')
+            if len(parts) != 3:
+                print(f"Invalid message format: expected 3 parts, got {len(parts)}")
+                continue
+            ciphertext, iv, auth_tag = parts
+            plaintext = aes_gcm.decrypt(ciphertext, ASSOCIATED_DATA, iv, auth_tag)
+            recipient, message = plaintext.decode().split("|", 1)
+            print(f"\n[Received from {recipient}] {message}\nYou: ", end='', flush=True)
         except Exception as e:
-            print(f"Failed to decrypt message: {e}")
+            print(f"\nError: {e}\nYou: ", end='', flush=True)
 
-# Start the thread for receiving messages
-thread = Thread(target=output_recvfrom, args=(sock,))
-thread.start()
+Thread(target=output_recvfrom, args=(sock,), daemon=True).start()
 
-# Sending messages
+print("You: ", end='', flush=True)
 for line in sys.stdin:
-    recipient_and_message = line.strip()
-    iv = os.urandom(16)  # Generate a random IV for each message
-    ciphertext, auth_tag = aes_gcm.encrypt(recipient_and_message.encode(), associated_data, iv)
-
-    # Send the encrypted message in the format: ciphertext|iv|auth_tag
-    data = ciphertext + b'|$' + iv + b'|$' + auth_tag
-    sock.sendto(data, server_addr)
+    recipient_message = line.strip()
+    if not recipient_message:
+        continue
+    iv = os.urandom(AESGCM.IV_LENGTH)
+    ciphertext, auth_tag = aes_gcm.encrypt(recipient_message.encode(), ASSOCIATED_DATA, iv)
+    sock.sendto(b'|$'.join([ciphertext, iv, auth_tag]), SERVER_ADDR)
+    print("You: ", end='', flush=True)
 
 sock.close()
-thread.join()

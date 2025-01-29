@@ -2,9 +2,9 @@ import unittest
 import threading
 import socket
 import os
+import time
 from aes_gcm import AESGCM
 from server import main as server_main
-import time
 
 class TestClientServerIntegration(unittest.TestCase):
     @classmethod
@@ -23,7 +23,6 @@ class TestClientServerIntegration(unittest.TestCase):
 
     def test_client_to_server_to_client(self):
         """Simulate two clients communicating through the server."""
-        # Start two clients
         client1_thread = threading.Thread(target=self.client_behavior, args=("Client1", "Client2", "Hello from Client1"))
         client2_thread = threading.Thread(target=self.client_behavior, args=("Client2", None, None))
 
@@ -39,15 +38,13 @@ class TestClientServerIntegration(unittest.TestCase):
         client_socket.sendto(client_name.encode(), self.server_address)  # Register with the server
 
         if message:
-            # Encrypt and send the message to the server
-            iv = os.urandom(16)
+            iv = os.urandom(AESGCM.IV_LENGTH)
             plaintext = f"{recipient_name}|{message}".encode()
             ciphertext, auth_tag = self.aes_gcm.encrypt(plaintext, self.associated_data, iv)
-            encrypted_message = ciphertext + b'|$' + iv + b'|$' + auth_tag
+            encrypted_message = b"|$".join([ciphertext, iv, auth_tag])
             print(f"{client_name} sending encrypted message:\n{encrypted_message}\n")
             client_socket.sendto(encrypted_message, self.server_address)
         else:
-            # Wait to receive a message from the server
             data, _ = client_socket.recvfrom(2048)
             print(f"{client_name} received encrypted message:\n{data}\n")
             ciphertext, iv, auth_tag = data.split(b'|$')

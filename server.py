@@ -3,85 +3,74 @@ from aes_gcm import AESGCM
 import os
 from dotenv import load_dotenv
 
-# Load environment variables
 load_dotenv()
 
-# Retrieve AES key and convert it to bytes
+# AES Configuration
 aes_key = b'T\xf8p\xcb\xc1n\xd6\xa1}\x93\x1f\x94\x9d\xd7\xb7\xe6yT\r\xe4\xb0\x8b\x8b\xd00\x00\xdd<\xb2\xba\xe2\xf3'
-
-if len(aes_key) not in (16, 24, 32):
-    raise ValueError("Invalid key length: key must be 128, 192, or 256 bits.")
-
-# Initialize AESGCM
 aes_gcm = AESGCM(aes_key)
 
-# Server configuration
+# Server Configuration
 UDP_IP = '0.0.0.0'
 UDP_PORT = 9999
-client_dict = {}
-
-# Create the server socket
-sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
-associated_data = b"authenticated-data"
+ASSOCIATED_DATA = b"authenticated-data"
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.bind((UDP_IP, UDP_PORT))
 
-def get_key(val):
-    for key, value in client_dict.items():
-        if val == value:
-            return key
+# Bidirectional dictionary for client lookup
+class ClientRegistry:
+    def __init__(self):
+        self.name_to_addr = {}
+        self.addr_to_name = {}
+
+    def register(self, name, addr):
+        self.name_to_addr[name] = addr
+        self.addr_to_name[addr] = name
+
+    def get_addr(self, name):
+        return self.name_to_addr.get(name)
+
+    def get_name(self, addr):
+        return self.addr_to_name.get(addr)
+
+clients = ClientRegistry()
 
 def main():
-    print("Server is starting...")
+    print("Server started on port 9999")
     while True:
-        data, addr = sock.recvfrom(2048)
-        if addr not in client_dict.values():
-            # Register a new client
-            client_dict[data.decode()] = addr
-            print(f"{data.decode()} is connected on port {addr[1]}.")
-            print("Connected users:", list(client_dict.keys()))
-        else:
-            try:
-                print(f"Received message from {get_key(addr)}")
-                
-                # Validate and split data
-                if data.count(b'|$') != 2:
-                    raise ValueError("Invalid message format. Expected ciphertext|iv|auth_tag.")
-                
-                ciphertext, iv, auth_tag = data.split(b'|$')  # Split data into components
-                
-                # Decrypt the incoming data
-                plaintext = aes_gcm.decrypt(ciphertext, associated_data, iv, auth_tag)
-                plaintext = plaintext.decode()  # Convert plaintext bytes to string
-                
-                # Parse the decrypted message
-                if "|" in plaintext:
-                    recipient_name, message = plaintext.split("|", 1)
+        data, addr = sock.recvfrom(4096)
+        if not clients.get_name(addr):
+            # New registration
+            name = data.decode()
+            clients.register(name, addr)
+            print(f"{name} connected from {addr}")
+            continue
 
-                    if recipient_name in client_dict:
-                        # Encrypt the message again before sending to the recipient
-                        sender_name = str(get_key(addr))
-                        recipient_addr = client_dict[recipient_name]
-                        new_iv = os.urandom(16)  # Generate a new IV for this transmission
-                        sender_and_message = sender_name + "|" + message
-                        sender_and_message = sender_and_message.encode()
-                        encrypted_message, new_auth_tag = aes_gcm.encrypt(sender_and_message, associated_data, new_iv)
-                        sock.sendto(encrypted_message + b'|$' + new_iv + b'|$' + new_auth_tag, recipient_addr)
-                    else:
-                        # Notify the sender that the recipient does not exist
-                        error_message = "Recipient not found."
-                        encrypted_error, error_tag = aes_gcm.encrypt(
-                            error_message.encode(), associated_data, os.urandom(16)
-                        )
-                        sock.sendto(encrypted_error + b'|$' + error_tag, addr)
-                else:
-                    # Notify the sender of incorrect message format
-                    error_message = "Invalid message format. Use: recipient_name|message"
-                    encrypted_error, error_tag = aes_gcm.encrypt(
-                        error_message.encode(), associated_data, os.urandom(16)
-                    )
-                    sock.sendto(encrypted_error + b'|$' + error_tag, addr)
-            except Exception as e:
-                print(f"Error handling message from {addr}: {e}")
+        # Process message
+        try:
+            parts = data.split(b'|$')
+            if len(parts) != 3:
+                raise ValueError("Invalid message format")
+            ciphertext, iv, auth_tag = parts
+            plaintext = aes_gcm.decrypt(ciphertext, ASSOCIATED_DATA, iv, auth_tag)
+            recipient, message = plaintext.decode().split("|", 1)
+            sender = clients.get_name(addr)
+
+            print(f"Routing message from {sender} to {recipient}")
+            recipient_addr = clients.get_addr(recipient)
+            if not recipient_addr:
+                error = f"Recipient '{recipient}' not found".encode()
+                iv_err = os.urandom(AESGCM.IV_LENGTH)
+                ct_err, tag_err = aes_gcm.encrypt(error, ASSOCIATED_DATA, iv_err)
+                sock.sendto(b'|$'.join([ct_err, iv_err, tag_err]), addr)
+                continue
+
+            # Re-encrypt with new IV for forward secrecy
+            new_iv = os.urandom(AESGCM.IV_LENGTH)
+            sender_msg = f"{sender}|{message}".encode()
+            ct_forward, tag_forward = aes_gcm.encrypt(sender_msg, ASSOCIATED_DATA, new_iv)
+            sock.sendto(b'|$'.join([ct_forward, new_iv, tag_forward]), recipient_addr)
+        except Exception as e:
+            print(f"Error processing message: {e}")
 
 if __name__ == "__main__":
     main()

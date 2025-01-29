@@ -3,81 +3,71 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.hashes import SHA256
 from cryptography.hazmat.primitives.hmac import HMAC
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives.padding import PKCS7
+from cryptography.exceptions import InvalidSignature
 
 class AESGCM:
+    IV_LENGTH = 16
+    TAG_LENGTH = 32
+
     def __init__(self, key):
         if len(key) not in (16, 24, 32):
-            raise ValueError("Invalid key length: key must be 128, 192, or 256 bits.")
+            raise ValueError("Key must be 128, 192, or 256 bits (16/24/32 bytes).")
         self.key = key
 
     def encrypt(self, plaintext, associated_data, iv):
         if not plaintext:
             raise ValueError("Plaintext cannot be empty.")
-        if not associated_data:
-            raise ValueError("Associated data cannot be empty.")
-        if len(iv) != 16:
-            raise ValueError("IV must be 128 bits (16 bytes).")
-
-        # Pad the plaintext to block size
-        padder = PKCS7(128).padder()
-        padded_plaintext = padder.update(plaintext) + padder.finalize()
-
-        # Encrypt the plaintext
+        if len(iv) != self.IV_LENGTH:
+            raise ValueError(f"IV must be {self.IV_LENGTH} bytes.")
+        
+        # Encrypt using AES-CTR
         encryptor = Cipher(
-            algorithms.AES(self.key), modes.CTR(iv), backend=default_backend()
+            algorithms.AES(self.key),
+            modes.CTR(iv),
+            backend=default_backend()
         ).encryptor()
-        ciphertext = encryptor.update(padded_plaintext) + encryptor.finalize()
+        ciphertext = encryptor.update(plaintext) + encryptor.finalize()
 
-        # Generate the authentication tag
+        # Generate authentication tag
         auth_tag = self._generate_auth_tag(associated_data, iv, ciphertext)
-
+        print(f"[ENCRYPTED] IV: {iv.hex()}, Ciphertext: {ciphertext.hex()}, Tag: {auth_tag.hex()[:8]}...")
         return ciphertext, auth_tag
 
     def decrypt(self, ciphertext, associated_data, iv, auth_tag):
-        if not ciphertext:
-            raise ValueError("Ciphertext cannot be empty.")
-        if not associated_data:
-            raise ValueError("Associated data cannot be empty.")
-        if len(iv) != 16:
-            raise ValueError("IV must be 128 bits (16 bytes).")
-        if not auth_tag:
-            raise ValueError("Authentication tag cannot be empty.")
+        if len(iv) != self.IV_LENGTH:
+            raise ValueError(f"IV must be {self.IV_LENGTH} bytes.")
+        if len(auth_tag) != self.TAG_LENGTH:
+            raise ValueError(f"Tag must be {self.TAG_LENGTH} bytes.")
 
-        # Verify the authentication tag
+        # Verify authentication tag
         if not self._verify_auth_tag(associated_data, iv, ciphertext, auth_tag):
-            raise ValueError("Invalid authentication tag!")
+            raise InvalidSignature("Authentication tag verification failed")
 
-        # Decrypt the ciphertext
+        # Decrypt using AES-CTR
         decryptor = Cipher(
-            algorithms.AES(self.key), modes.CTR(iv), backend=default_backend()
+            algorithms.AES(self.key),
+            modes.CTR(iv),
+            backend=default_backend()
         ).decryptor()
-        padded_plaintext = decryptor.update(ciphertext) + decryptor.finalize()
-
-        # Unpad the plaintext
-        unpadder = PKCS7(128).unpadder()
-        plaintext = unpadder.update(padded_plaintext) + unpadder.finalize()
-
+        plaintext = decryptor.update(ciphertext) + decryptor.finalize()
+        print(f"[DECRYPTED] IV: {iv.hex()}, Plaintext: {plaintext.decode()}")
         return plaintext
 
     def _generate_auth_tag(self, associated_data, iv, ciphertext):
-        # Concatenate associated data, IV, and ciphertext for the HMAC input
-        mac_input = associated_data + iv + ciphertext
-
-        # Create HMAC using SHA-256
+        mac_data = b"".join([
+            associated_data,
+            iv,
+            ciphertext
+        ])
         hmac = HMAC(self.key, SHA256(), backend=default_backend())
-        hmac.update(mac_input)
+        hmac.update(mac_data)
         return hmac.finalize()
 
     def _verify_auth_tag(self, associated_data, iv, ciphertext, auth_tag):
+        hmac = HMAC(self.key, SHA256(), backend=default_backend())
+        hmac.update(associated_data + iv + ciphertext)
         try:
-            mac_input = associated_data + iv + ciphertext
-
-            # Recompute HMAC and verify
-            hmac = HMAC(self.key, SHA256(), backend=default_backend())
-            hmac.update(mac_input)
             hmac.verify(auth_tag)
             return True
-        except Exception:
+        except InvalidSignature:
             return False
-
