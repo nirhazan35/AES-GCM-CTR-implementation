@@ -45,17 +45,17 @@ class TestClientServerIntegration(unittest.TestCase):
         client_socket.sendto(client_name.encode(), self.server_address)  # Register with the server
 
         if message:
-            iv = os.urandom(AESGCM.IV_LENGTH)
+            nonce = os.urandom(AESGCM.NONCE_LENGTH)
             plaintext = f"{recipient_name}|{message}".encode()
-            ciphertext, auth_tag = self.aes_gcm.encrypt(plaintext, self.associated_data, iv)
-            encrypted_message = b"|$".join([ciphertext, iv, auth_tag])
+            ciphertext, auth_tag = self.aes_gcm.encrypt(plaintext, self.associated_data, nonce)
+            encrypted_message = b"|$".join([ciphertext, nonce, auth_tag])
             print(f"{client_name} sending encrypted message:\n{encrypted_message}\n")
             client_socket.sendto(encrypted_message, self.server_address)
         else:
             data, _ = client_socket.recvfrom(2048)
             print(f"{client_name} received encrypted message:\n{data}\n")
-            ciphertext, iv, auth_tag = data.split(b'|$')
-            plaintext = self.aes_gcm.decrypt(ciphertext, self.associated_data, iv, auth_tag)
+            ciphertext, nonce, auth_tag = data.split(b'|$')
+            plaintext = self.aes_gcm.decrypt(ciphertext, self.associated_data, nonce, auth_tag)
             print(f"{client_name} decrypted message: {plaintext.decode()}")
 
         client_socket.close()
