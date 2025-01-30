@@ -40,8 +40,8 @@ def output_recvfrom(sock):
             if len(parts) != 3:
                 print(f"Invalid message format: expected 3 parts, got {len(parts)}")
                 continue
-            ciphertext, iv, auth_tag = parts
-            plaintext = aes_gcm.decrypt(ciphertext, ASSOCIATED_DATA, iv, auth_tag)
+            ciphertext, nonce, auth_tag = parts
+            plaintext = aes_gcm.decrypt(ciphertext, ASSOCIATED_DATA, nonce, auth_tag)
             recipient, message = plaintext.decode().split("|", 1)
             print(f"\n[Received from {recipient}] {message}\nYou: ", end='', flush=True)
         except Exception as e:
@@ -54,9 +54,9 @@ for line in sys.stdin:
     recipient_message = line.strip()
     if not recipient_message:
         continue
-    iv = os.urandom(AESGCM.IV_LENGTH)
-    ciphertext, auth_tag = aes_gcm.encrypt(recipient_message.encode(), ASSOCIATED_DATA, iv)
-    sock.sendto(b'|$'.join([ciphertext, iv, auth_tag]), SERVER_ADDR)
+    nonce = os.urandom(AESGCM.NONCE_LENGTH)
+    ciphertext, auth_tag = aes_gcm.encrypt(recipient_message.encode(), ASSOCIATED_DATA, nonce)
+    sock.sendto(b'|$'.join([ciphertext, nonce, auth_tag]), SERVER_ADDR)
     print("You: ", end='', flush=True)
 
 sock.close()

@@ -57,8 +57,9 @@ def main():
             parts = data.split(b'|$')
             if len(parts) != 3:
                 raise ValueError("Invalid message format")
-            ciphertext, iv, auth_tag = parts
-            plaintext = aes_gcm.decrypt(ciphertext, ASSOCIATED_DATA, iv, auth_tag)
+            ciphertext, nonce, auth_tag = parts
+            print(f"[Received from {clients.get_name(addr)}] Ciphertext: {ciphertext.hex()}, NONCE: {nonce.hex()}, Tag: {auth_tag.hex()}...")
+            plaintext = aes_gcm.decrypt(ciphertext, ASSOCIATED_DATA, nonce, auth_tag)
             recipient, message = plaintext.decode().split("|", 1)
             sender = clients.get_name(addr)
 
@@ -66,16 +67,16 @@ def main():
             recipient_addr = clients.get_addr(recipient)
             if not recipient_addr:
                 error = f"Recipient '{recipient}' not found".encode()
-                iv_err = os.urandom(AESGCM.IV_LENGTH)
-                ct_err, tag_err = aes_gcm.encrypt(error, ASSOCIATED_DATA, iv_err)
-                sock.sendto(b'|$'.join([ct_err, iv_err, tag_err]), addr)
+                nonce_err = os.urandom(AESGCM.NONCE_LENGTH)
+                ct_err, tag_err = aes_gcm.encrypt(error, ASSOCIATED_DATA, nonce_err)
+                sock.sendto(b'|$'.join([ct_err, nonce_err, tag_err]), addr)
                 continue
 
-            # Re-encrypt with new IV for forward secrecy
-            new_iv = os.urandom(AESGCM.IV_LENGTH)
+            # Re-encrypt with new NONCE for forward secrecy
+            new_nonce = os.urandom(AESGCM.NONCE_LENGTH)
             sender_msg = f"{sender}|{message}".encode()
-            ct_forward, tag_forward = aes_gcm.encrypt(sender_msg, ASSOCIATED_DATA, new_iv)
-            sock.sendto(b'|$'.join([ct_forward, new_iv, tag_forward]), recipient_addr)
+            ct_forward, tag_forward = aes_gcm.encrypt(sender_msg, ASSOCIATED_DATA, new_nonce)
+            sock.sendto(b'|$'.join([ct_forward, new_nonce, tag_forward]), recipient_addr)
         except Exception as e:
             print(f"Error processing message: {e}")
 
