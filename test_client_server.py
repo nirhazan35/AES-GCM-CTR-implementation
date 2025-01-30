@@ -5,8 +5,12 @@ import os
 import time
 from aes_gcm import AESGCM
 from server import main as server_main
+from dotenv import load_dotenv
+import binascii
+
 
 class TestClientServerIntegration(unittest.TestCase):
+    load_dotenv()
     @classmethod
     def setUpClass(cls):
         """Start the server in a separate thread."""
@@ -16,7 +20,10 @@ class TestClientServerIntegration(unittest.TestCase):
 
     def setUp(self):
         """Set up the AES key and associated data."""
-        self.key = b'T\xf8p\xcb\xc1n\xd6\xa1}\x93\x1f\x94\x9d\xd7\xb7\xe6yT\r\xe4\xb0\x8b\x8b\xd00\x00\xdd<\xb2\xba\xe2\xf3'
+        aes_key_hex = os.getenv("AES_KEY")
+        if aes_key_hex is None:
+            raise ValueError("AES_KEY is not set in the .env file")
+        self.key = binascii.unhexlify(aes_key_hex)
         self.associated_data = b"authenticated-data"
         self.aes_gcm = AESGCM(self.key)
         self.server_address = ('127.0.0.1', 9999)

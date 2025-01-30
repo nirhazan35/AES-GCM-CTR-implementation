@@ -2,11 +2,18 @@ import socket
 from aes_gcm import AESGCM
 import os
 from dotenv import load_dotenv
+import binascii
 
 load_dotenv()
 
 # AES Configuration
-aes_key = b'T\xf8p\xcb\xc1n\xd6\xa1}\x93\x1f\x94\x9d\xd7\xb7\xe6yT\r\xe4\xb0\x8b\x8b\xd00\x00\xdd<\xb2\xba\xe2\xf3'
+aes_key_hex = os.getenv("AES_KEY")
+if aes_key_hex is None:
+    raise ValueError("AES_KEY is not set in the .env file")
+
+aes_key = binascii.unhexlify(aes_key_hex)
+if len(aes_key) not in (16, 24, 32):
+    raise ValueError("Invalid AES key length")
 aes_gcm = AESGCM(aes_key)
 
 # Server Configuration
