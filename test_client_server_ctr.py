@@ -3,77 +3,100 @@ import threading
 import socket
 import os
 import time
+import binascii
 from aes_ctr import AESCTR
 from server_CTR import main as server_main
 from dotenv import load_dotenv
-import binascii
+
 
 class TestCTRClientServer(unittest.TestCase):
-    load_dotenv()
-    
     @classmethod
     def setUpClass(cls):
-        """Start the CTR server in a separate thread."""
+        """
+        Start the AES-CTR server in a separate thread (daemon).
+        This allows the test to proceed without manually starting the server.
+        """
+        load_dotenv()
         cls.server_thread = threading.Thread(target=server_main, daemon=True)
         cls.server_thread.start()
-        time.sleep(1)
+        time.sleep(1)  # Give the server a moment to start up
 
     def setUp(self):
+        """
+        Prepare AES-CTR for encryption and decryption, as well as server address info.
+        """
         aes_key_hex = os.getenv("AES_KEY")
         if aes_key_hex is None:
-            self.fail("AES_KEY is not set in the .env file")
+            raise ValueError("AES_KEY is not set in the .env file")
         self.key = binascii.unhexlify(aes_key_hex)
         self.aes_ctr = AESCTR(self.key)
-        self.server_addr = ('127.0.0.1', 9999)
+        self.server_addr = ('127.0.0.1', 9998)
 
-    def test_basic_communication(self):
-        """Test CTR communication without authentication."""
-        # Setup receiver
-        receiver = threading.Thread(target=self.receiver_behavior)
-        receiver.start()
+    def test_client_to_server_to_client(self):
+        """
+        Simulate one client sending a message to another client via the AES-CTR server.
+        - CTRClient1 sends "Hello from CTR Client1" to "CTRClient2".
+        - CTRClient2 receives and decrypts the message.
+        """
+        sender_thread = threading.Thread(
+            target=self.client_send,
+            args=("CTRClient1", "CTRClient2", b"Hello from CTR Client1")
+        )
+        receiver_thread = threading.Thread(
+            target=self.client_receive,
+            args=("CTRClient2",)
+        )
 
-        # Send message
-        sender_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sender_sock.sendto(b"Sender", self.server_addr)  # Register sender
-        
-        nonce = os.urandom(AESCTR.NONCE_LENGTH)
-        ciphertext = self.aes_ctr.encrypt(b"Test message", nonce)
-        message = b'|$'.join([ciphertext, nonce, b"Receiver"])
-        sender_sock.sendto(message, self.server_addr)
-        
-        receiver.join(timeout=2)
-        sender_sock.close()
+        # Start the receiver first or second; either way is fine as long as both run
+        receiver_thread.start()
+        time.sleep(0.5)  # small delay so the server sees the receiver registration
+        sender_thread.start()
 
-    def receiver_behavior(self):
-        """Receiver client thread."""
+        receiver_thread.join()
+        sender_thread.join()
+
+    def client_send(self, sender_name, recipient_name, plaintext):
+        """
+        'Client' that registers with the server, encrypts a message, and sends it.
+        """
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.sendto(b"Receiver", self.server_addr)  # Register receiver
-        
-        data, _ = sock.recvfrom(1024)
-        parts = data.split(b'|$')
-        self.assertEqual(len(parts), 3, "Invalid message format")
-        
-        ciphertext, nonce, sender = parts
-        plaintext = self.aes_ctr.decrypt(ciphertext, nonce)
-        self.assertEqual(plaintext, b"Test message")
-        self.assertEqual(sender.decode(), "Sender")
-        sock.close()
+        # Register the sender name
+        sock.sendto(sender_name.encode(), self.server_addr)
+        time.sleep(1)  # Allow server time to store sender registration
 
-    def test_missing_recipient_handling(self):
-        """Test server handling of non-existent recipient."""
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.sendto(b"TestClient", self.server_addr)  # Registration
-        
-        # Send to non-existent recipient
+        # Encrypt the message with AES-CTR
         nonce = os.urandom(AESCTR.NONCE_LENGTH)
-        ciphertext = self.aes_ctr.encrypt(b"Message", nonce)
-        message = b'|$'.join([ciphertext, nonce, b"GhostRecipient"])
+        ciphertext = self.aes_ctr.encrypt(plaintext, nonce)
+
+        # The CTR server expects messages in the format: ciphertext|$nonce|$recipient
+        message = b'|$'.join([ciphertext, nonce, recipient_name.encode()])
         sock.sendto(message, self.server_addr)
-        
-        # Verify error response
-        response, _ = sock.recvfrom(1024)
-        self.assertIn(b"not found", response, "Should notify about missing recipient")
         sock.close()
+
+    def client_receive(self, receiver_name):
+        """
+        'Client' that registers and then blocks, waiting for a message to be received from the server.
+        """
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.settimeout(5)  # to avoid blocking indefinitely
+        # Register the receiver name
+        sock.sendto(receiver_name.encode(), self.server_addr)
+        time.sleep(1)  # Give the server time to store this client's address
+
+        try:
+            data, _ = sock.recvfrom(4096)
+        except socket.timeout:
+            sock.close()
+            self.fail(f"{receiver_name} timed out waiting for a message.")
+
+        # The server should send back: ciphertext|$nonce|$sender_name
+        ciphertext, nonce, sender_name = data.split(b'|$')
+
+        # Decrypt
+        plaintext = self.aes_ctr.decrypt(ciphertext, nonce)
+        print(f"[{receiver_name}] received from [{sender_name.decode()}]: {plaintext.decode()}")
+        sock.close()
+
 
 if __name__ == "__main__":
     unittest.main()

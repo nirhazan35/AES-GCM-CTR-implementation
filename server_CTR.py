@@ -18,7 +18,7 @@ aes_ctr = AESCTR(aes_key)
 
 # Server Configuration
 UDP_IP = '0.0.0.0'
-UDP_PORT = 9999
+UDP_PORT = 9998
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.bind((UDP_IP, UDP_PORT))
 
