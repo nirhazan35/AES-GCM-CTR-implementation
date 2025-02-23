@@ -1,5 +1,5 @@
 import socket
-from aes_gcm import AESGCM
+from aes_ctr import AESCTR
 import os
 from dotenv import load_dotenv
 import binascii
@@ -14,12 +14,11 @@ if aes_key_hex is None:
 aes_key = binascii.unhexlify(aes_key_hex)
 if len(aes_key) not in (16, 24, 32):
     raise ValueError("Invalid AES key length")
-aes_gcm = AESGCM(aes_key)
+aes_ctr = AESCTR(aes_key)
 
 # Server Configuration
 UDP_IP = '0.0.0.0'
 UDP_PORT = 9999
-ASSOCIATED_DATA = b"authenticated-data"
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.bind((UDP_IP, UDP_PORT))
 
@@ -55,29 +54,23 @@ def main():
         # Process message
         try:
             parts = data.split(b'|$')
-            if len(parts) != 4:
-                raise ValueError(f"Invalid message format: expected 4 parts, got {len(parts)}")
+            if len(parts) != 3:
+                raise ValueError(f"Invalid message format: expected 3 parts, got {len(parts)}")
             sender = clients.get_name(addr)
-            ciphertext, nonce, auth_tag, recipient = parts
+            ciphertext, nonce, recipient = parts
             recipient = recipient.decode()
-            print(f"[Received message from {sender}], sending to {recipient}")
-            # plaintext = aes_gcm.decrypt(ciphertext, ASSOCIATED_DATA, nonce, auth_tag)
-            # recipient, message = plaintext.decode().split("|", 1)
+            print(f"Received message from {sender}, forwarding to {recipient}")
             
             recipient_addr = clients.get_addr(recipient)
             if not recipient_addr:
                 print(f"Recipient '{recipient}' not found")
                 error = f"Recipient '{recipient}' not found".encode()
-                nonce_err = os.urandom(AESGCM.NONCE_LENGTH)
-                ct_err, tag_err = aes_gcm.encrypt(error, ASSOCIATED_DATA, nonce_err)
+                nonce_err = os.urandom(AESCTR.NONCE_LENGTH)
+                ct_err, tag_err = aes_ctr.encrypt(error, nonce_err)
                 sock.sendto(b'|$'.join([ct_err, nonce_err, tag_err]), addr)
                 continue
 
-            # Re-encrypt with new NONCE for forward secrecy
-            # new_nonce = os.urandom(AESGCM.NONCE_LENGTH)
-            # sender_msg = f"{sender}|{message}".encode()
-            # ct_forward, tag_forward = aes_gcm.encrypt(sender_msg, ASSOCIATED_DATA, new_nonce)
-            sock.sendto(b'|$'.join([ciphertext, nonce, auth_tag, sender.encode()]), recipient_addr)
+            sock.sendto(b'|$'.join([ciphertext, nonce, sender.encode()]), recipient_addr)
         except Exception as e:
             print(f"Error processing message: {e}")
 

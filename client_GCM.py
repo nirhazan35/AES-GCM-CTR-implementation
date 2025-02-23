@@ -44,7 +44,6 @@ def output_recvfrom(sock):
             sender = sender.decode()
             plaintext = aes_gcm.decrypt(ciphertext, ASSOCIATED_DATA, nonce, auth_tag)
             message = plaintext.decode()
-            # recipient, message = plaintext.decode().split("|", 1)
             print(f"\n[Received from {sender}] {message}\nYou: ", end='', flush=True)
         except Exception as e:
             print(f"\nError: {e}\nYou: ", end='', flush=True)
