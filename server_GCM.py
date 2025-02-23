@@ -3,6 +3,7 @@ from aes_gcm import AESGCM
 import os
 from dotenv import load_dotenv
 import binascii
+import random
 
 load_dotenv()
 
@@ -19,6 +20,7 @@ aes_gcm = AESGCM(aes_key)
 # Server Configuration
 UDP_IP = '0.0.0.0'
 UDP_PORT = 9999
+# UDP_PORT = random.randint(0000, 9999)
 ASSOCIATED_DATA = b"authenticated-data"
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.bind((UDP_IP, UDP_PORT))

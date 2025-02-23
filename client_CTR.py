@@ -22,11 +22,7 @@ SERVER_ADDR = ('127.0.0.1', 9999)
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 aes_ctr = AESCTR(aes_key)
 
-# Check if running inside pytest
-if "PYTEST_RUNNING" in os.environ:
-    my_name = "TestClient"
-else:
-    my_name = input("Enter your name: ")
+my_name = input("Enter your name: ")
 sock.sendto(my_name.encode(), SERVER_ADDR)
 
 def output_recvfrom(sock):

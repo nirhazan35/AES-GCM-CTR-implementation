@@ -23,11 +23,7 @@ sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 ASSOCIATED_DATA = b"authenticated-data"
 aes_gcm = AESGCM(aes_key)
 
-# Check if running inside pytest
-if "PYTEST_RUNNING" in os.environ:
-    my_name = "TestClient"
-else:
-    my_name = input("Enter your name: ")
+my_name = input("Enter your name: ")
 sock.sendto(my_name.encode(), SERVER_ADDR)
 
 def output_recvfrom(sock):
