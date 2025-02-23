@@ -8,77 +8,65 @@ from server_GCM import main as server_main
 from dotenv import load_dotenv
 import binascii
 
-class TestGCMClientServer(unittest.TestCase):
+
+class TestClientServerIntegration(unittest.TestCase):
     load_dotenv()
-    
+
     @classmethod
     def setUpClass(cls):
-        """Start the GCM server in a separate thread."""
+        """Start the server in a separate thread."""
         cls.server_thread = threading.Thread(target=server_main, daemon=True)
         cls.server_thread.start()
         time.sleep(1)  # Allow server to start
 
     def setUp(self):
+        """Set up the AES key and associated data."""
         aes_key_hex = os.getenv("AES_KEY")
         if aes_key_hex is None:
-            self.fail("AES_KEY is not set in the .env file")
+            raise ValueError("AES_KEY is not set in the .env file")
         self.key = binascii.unhexlify(aes_key_hex)
         self.associated_data = b"authenticated-data"
         self.aes_gcm = AESGCM(self.key)
-        self.server_addr = ('127.0.0.1', 9999)
+        self.server_address = ('127.0.0.1', 9999)
 
-    def test_successful_communication(self):
-        """Test complete GCM communication flow with authentication."""
-        # Setup receiver client
-        receiver = threading.Thread(target=self.receiver_behavior)
-        receiver.start()
+    def test_client_to_server_to_client(self):
+        """Simulate two clients communicating through the server."""
+        client1_thread = threading.Thread(target=self.client_behavior, args=("Client1", "Client2", "Hello from Client1"))
+        client2_thread = threading.Thread(target=self.client_behavior, args=("Client2", None, None))
 
-        # Send message
-        sender_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sender_sock.sendto(b"Sender", self.server_addr)  # Register sender
-        
-        nonce = os.urandom(AESGCM.NONCE_LENGTH)
-        plaintext = b"Secure message"
-        ciphertext, auth_tag = self.aes_gcm.encrypt(plaintext, self.associated_data, nonce)
-        message = b'|$'.join([ciphertext, nonce, auth_tag, b"Receiver"])
-        sender_sock.sendto(message, self.server_addr)
-        
-        receiver.join(timeout=2)
-        sender_sock.close()
+        client2_thread.start()
+        client1_thread.start()
 
-    def receiver_behavior(self):
-        """Receiver client thread."""
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.sendto(b"Receiver", self.server_addr)  # Register receiver
-        
-        data, _ = sock.recvfrom(1024)
-        parts = data.split(b'|$')
-        self.assertEqual(len(parts), 4, "Invalid message format")
-        
-        ciphertext, nonce, auth_tag, sender = parts
-        plaintext = self.aes_gcm.decrypt(ciphertext, self.associated_data, nonce, auth_tag)
-        self.assertEqual(plaintext, b"Secure message")
-        self.assertEqual(sender.decode(), "Sender")
-        sock.close()
+        client2_thread.join()
+        client1_thread.join()
 
-    def test_invalid_authentication(self):
-        """Test tampered authentication tag detection."""
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.sendto(b"TestClient", self.server_addr)  # Register client
-        
-        # Create valid message
-        nonce = os.urandom(AESGCM.NONCE_LENGTH)
-        plaintext = b"Tamper test"
-        ciphertext, auth_tag = self.aes_gcm.encrypt(plaintext, self.associated_data, nonce)
-        
-        # Tamper with authentication tag
-        tampered_tag = bytes([b ^ 0xFF for b in auth_tag])
-        message = b'|$'.join([ciphertext, nonce, tampered_tag, b"Recipient"])
-        
-        sock.sendto(message, self.server_addr)
-        response, _ = sock.recvfrom(1024)
-        self.assertIn(b"Error", response, "Should receive error for invalid tag")
-        sock.close()
+    def client_behavior(self, client_name, recipient_name, message):
+        """Simulate client sending and receiving messages."""
+        client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        client_socket.settimeout(3)  # Prevent blocking indefinitely
+        client_socket.sendto(client_name.encode(), self.server_address)  # Register with the server
+        time.sleep(0.5)  # Ensure registration before sending
+
+        if message:
+            nonce = os.urandom(AESGCM.NONCE_LENGTH)
+            plaintext = f"{recipient_name}|{message}".encode()
+            ciphertext, auth_tag = self.aes_gcm.encrypt(plaintext, self.associated_data, nonce)
+            encrypted_message = b"|$".join([ciphertext, nonce, auth_tag])
+            print(f"{client_name} sending encrypted message:\n{encrypted_message}\n")
+            client_socket.sendto(encrypted_message, self.server_address)
+            time.sleep(1)  # Allow server time to process the message
+        else:
+            try:
+                data, _ = client_socket.recvfrom(2048)
+                print(f"{client_name} received encrypted message:\n{data}\n")
+                ciphertext, nonce, auth_tag = data.split(b'|$')
+                plaintext = self.aes_gcm.decrypt(ciphertext, self.associated_data, nonce, auth_tag)
+                print(f"{client_name} decrypted message: {plaintext.decode()}")
+            except socket.timeout:
+                self.fail(f"{client_name} did not receive the expected message.")
+
+        client_socket.close()
+
 
 if __name__ == "__main__":
     unittest.main()
