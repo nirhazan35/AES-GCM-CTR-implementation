@@ -4,7 +4,7 @@ import socket
 import os
 import time
 from aes_gcm import AESGCM
-from server import main as server_main
+from server_GCM import main as server_main
 from dotenv import load_dotenv
 import binascii
 
