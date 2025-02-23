@@ -18,7 +18,7 @@ if len(aes_key) not in (16, 24, 32):
     raise ValueError("Invalid AES key length")
 
 # Network Configuration
-SERVER_ADDR = ('127.0.0.1', 9999)
+SERVER_ADDR = ('127.0.0.1', 9998)
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 aes_ctr = AESCTR(aes_key)
 
