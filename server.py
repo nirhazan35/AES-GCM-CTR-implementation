@@ -55,17 +55,18 @@ def main():
         # Process message
         try:
             parts = data.split(b'|$')
-            if len(parts) != 3:
-                raise ValueError("Invalid message format")
-            ciphertext, nonce, auth_tag = parts
-            print(f"[Received from {clients.get_name(addr)}] Ciphertext: {ciphertext.hex()}, NONCE: {nonce.hex()}, Tag: {auth_tag.hex()}...")
-            plaintext = aes_gcm.decrypt(ciphertext, ASSOCIATED_DATA, nonce, auth_tag)
-            recipient, message = plaintext.decode().split("|", 1)
+            if len(parts) != 4:
+                raise ValueError(f"Invalid message format: expected 4 parts, got {len(parts)}")
             sender = clients.get_name(addr)
-
-            print(f"Routing message from {sender} to {recipient}")
+            ciphertext, nonce, auth_tag, recipient = parts
+            recipient = recipient.decode()
+            print(f"[Received message from {sender}], sending to {recipient}")
+            # plaintext = aes_gcm.decrypt(ciphertext, ASSOCIATED_DATA, nonce, auth_tag)
+            # recipient, message = plaintext.decode().split("|", 1)
+            
             recipient_addr = clients.get_addr(recipient)
             if not recipient_addr:
+                print(f"Recipient '{recipient}' not found")
                 error = f"Recipient '{recipient}' not found".encode()
                 nonce_err = os.urandom(AESGCM.NONCE_LENGTH)
                 ct_err, tag_err = aes_gcm.encrypt(error, ASSOCIATED_DATA, nonce_err)
@@ -73,10 +74,10 @@ def main():
                 continue
 
             # Re-encrypt with new NONCE for forward secrecy
-            new_nonce = os.urandom(AESGCM.NONCE_LENGTH)
-            sender_msg = f"{sender}|{message}".encode()
-            ct_forward, tag_forward = aes_gcm.encrypt(sender_msg, ASSOCIATED_DATA, new_nonce)
-            sock.sendto(b'|$'.join([ct_forward, new_nonce, tag_forward]), recipient_addr)
+            # new_nonce = os.urandom(AESGCM.NONCE_LENGTH)
+            # sender_msg = f"{sender}|{message}".encode()
+            # ct_forward, tag_forward = aes_gcm.encrypt(sender_msg, ASSOCIATED_DATA, new_nonce)
+            sock.sendto(b'|$'.join([ciphertext, nonce, auth_tag, sender.encode()]), recipient_addr)
         except Exception as e:
             print(f"Error processing message: {e}")
 

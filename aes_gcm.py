@@ -29,7 +29,7 @@ class AESGCM:
         # Get AES-GCM authentication tag (16 bytes)
         auth_tag = encryptor.tag  
 
-        print(f"[ENCRYPTED] Nonce: {nonce.hex()}, Ciphertext: {ciphertext.hex()}, Tag: {auth_tag.hex()[:8]}...")
+        print(f"[ENCRYPTED] Ciphertext: {ciphertext.hex()}")
         return ciphertext, auth_tag
 
     def decrypt(self, ciphertext, associated_data, nonce, auth_tag):
@@ -37,6 +37,7 @@ class AESGCM:
             raise ValueError(f"Nonce must be {self.NONCE_LENGTH} bytes.")
         if len(auth_tag) != self.TAG_LENGTH:
             raise ValueError(f"Tag must be {self.TAG_LENGTH} bytes.")
+        print(f"[DECRYPTED] Ciphertext before decryption: {ciphertext.hex()}")
 
         # Decrypt using AES-GCM
         decryptor = Cipher(
@@ -46,6 +47,4 @@ class AESGCM:
         ).decryptor()
         decryptor.authenticate_additional_data(associated_data)
         plaintext = decryptor.update(ciphertext) + decryptor.finalize()
-
-        print(f"[DECRYPTED] Nonce: {nonce.hex()}, Plaintext: {plaintext.decode()}")
         return plaintext

@@ -37,13 +37,15 @@ def output_recvfrom(sock):
             if not data:
                 break
             parts = data.split(b'|$')
-            if len(parts) != 3:
-                print(f"Invalid message format: expected 3 parts, got {len(parts)}")
+            if len(parts) != 4:
+                print(f"Invalid message format: expected 4 parts, got {len(parts)}")
                 continue
-            ciphertext, nonce, auth_tag = parts
+            ciphertext, nonce, auth_tag, sender = parts
+            sender = sender.decode()
             plaintext = aes_gcm.decrypt(ciphertext, ASSOCIATED_DATA, nonce, auth_tag)
-            recipient, message = plaintext.decode().split("|", 1)
-            print(f"\n[Received from {recipient}] {message}\nYou: ", end='', flush=True)
+            message = plaintext.decode()
+            # recipient, message = plaintext.decode().split("|", 1)
+            print(f"\n[Received from {sender}] {message}\nYou: ", end='', flush=True)
         except Exception as e:
             print(f"\nError: {e}\nYou: ", end='', flush=True)
 
@@ -54,9 +56,10 @@ for line in sys.stdin:
     recipient_message = line.strip()
     if not recipient_message:
         continue
+    recipient_name, message = recipient_message.split("|", 1)
     nonce = os.urandom(AESGCM.NONCE_LENGTH)
-    ciphertext, auth_tag = aes_gcm.encrypt(recipient_message.encode(), ASSOCIATED_DATA, nonce)
-    sock.sendto(b'|$'.join([ciphertext, nonce, auth_tag]), SERVER_ADDR)
+    ciphertext, auth_tag = aes_gcm.encrypt(message.encode(), ASSOCIATED_DATA, nonce)
+    sock.sendto(b'|$'.join([ciphertext, nonce, auth_tag, recipient_name.encode()]), SERVER_ADDR)
     print("You: ", end='', flush=True)
 
 sock.close()
