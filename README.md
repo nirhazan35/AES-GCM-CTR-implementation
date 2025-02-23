@@ -1,9 +1,9 @@
-
----
+## test
 
 # AES Secure Communication Project
 
 This project demonstrates **secure client-server communication** using:
+
 1. **AES-GCM** for authenticated encryption (confidentiality + integrity).
 2. **AES-CTR** for confidential encryption without integrity protection.
 
@@ -29,12 +29,14 @@ Each mode has its own **client** and **server** implementation, and a **test sui
 ## Installation & Setup
 
 1. **Clone the Repository**
+
    ```bash
    git clone https://github.com/nirhazan35/AES-GCM-CTR-implementation.git
    cd AES-GCM-CRT-implementation
    ```
 
 2. **Create a Virtual Environment & Activate**
+
    ```bash
    python -m venv venv
    source venv/bin/activate  # On macOS/Linux
@@ -42,6 +44,7 @@ Each mode has its own **client** and **server** implementation, and a **test sui
    ```
 
 3. **Install Dependencies**
+
    ```bash
    pip install -r requirements.txt
    ```
@@ -56,35 +59,38 @@ Each mode has its own **client** and **server** implementation, and a **test sui
      AES_KEY=00112233445566778899AABBCCDDEEFF00112233445566778899AABBCCDDEEFF
      ```
    - This key will be used by **both** the GCM and CTR servers/clients.
-   
 
 ---
 
 ## Usage
 
 ### 1. Running the AES-GCM Server & Client
+
 - **Server** (AES-GCM on port 9999):
+
   ```bash
   python server_GCM.py
   ```
+
   You should see `Server started on port 9999`.
 
 - **Client** (AES-GCM):
   ```bash
   python client_GCM.py
   ```
-  - Enter a **unique name** when prompted.  
+  - Enter a **unique name** when prompted.
   - Use `recipient_name|message` to send a message to another registered client.
 
 #### Example: Two GCM Clients
+
 1. **Terminal A**: `python server_GCM.py`
-2. **Terminal B**:  
+2. **Terminal B**:
    ```bash
    python client_GCM.py
    # Enter: GCMClient1
    ```
    - Send: `GCMClient2|Hello from GCMClient1!`
-3. **Terminal C**:  
+3. **Terminal C**:
    ```bash
    python client_GCM.py
    # Enter: GCMClient2
@@ -94,28 +100,32 @@ Each mode has its own **client** and **server** implementation, and a **test sui
 ---
 
 ### 2. Running the AES-CTR Server & Client
+
 - **Server** (AES-CTR on port 9998):
+
   ```bash
   python server_CTR.py
   ```
+
   You should see `Server started on port 9998`.
 
 - **Client** (AES-CTR):
   ```bash
   python client_CTR.py
   ```
-  - Enter a **unique name** when prompted.  
+  - Enter a **unique name** when prompted.
   - Use `recipient_name|message` to send a message to another registered client.
 
 #### Example: Two CTR Clients
+
 1. **Terminal A**: `python server_CTR.py`
-2. **Terminal B**:  
+2. **Terminal B**:
    ```bash
    python client_CTR.py
    # Enter: CTRClient1
    ```
    - Send: `CTRClient2|Hello from CTRClient1!`
-3. **Terminal C**:  
+3. **Terminal C**:
    ```bash
    python client_CTR.py
    # Enter: CTRClient2
@@ -130,20 +140,22 @@ Each mode has its own **client** and **server** implementation, and a **test sui
 
 This project includes multiple tests:
 
-| File                            | Description                                                           |
-|---------------------------------|-----------------------------------------------------------------------|
-| **`test_aes_ctr.py`**           | Validates AES-CTR unit tests (key/nonce sizes, encryption/decryption) |
-| **`test_aes_gcm.py`**           | Validates AES-GCM unit tests (encryption/decryption, auth tags)       |
-| **`test_client_server_ctr.py`** | Tests client-server flow using AES-CTR                                |
-| **`test_client_server_gcm.py`** | Tests client-server flow using AES-GCM                                |
-| **`test_security_properties.py`** | Tests confidentiality and integrity properties across modes         |
+| File                              | Description                                                           |
+| --------------------------------- | --------------------------------------------------------------------- |
+| **`test_aes_ctr.py`**             | Validates AES-CTR unit tests (key/nonce sizes, encryption/decryption) |
+| **`test_aes_gcm.py`**             | Validates AES-GCM unit tests (encryption/decryption, auth tags)       |
+| **`test_client_server_ctr.py`**   | Tests client-server flow using AES-CTR                                |
+| **`test_client_server_gcm.py`**   | Tests client-server flow using AES-GCM                                |
+| **`test_security_properties.py`** | Tests confidentiality and integrity properties across modes           |
 
 ### 1. Run All Tests
+
 ```bash
 pytest -v
 ```
 
 ### 2. Run Individual Tests
+
 - **AES-CTR Tests**:
   ```bash
   pytest -v test_aes_ctr.py test_client_server_ctr.py
@@ -161,19 +173,22 @@ pytest -v
 
 ## Key Points
 
-1. **AES Key**  
-   - Stored in `.env` under `AES_KEY` (hex-encoded, 128/192/256 bits).  
+1. **AES Key**
+
+   - Stored in `.env` under `AES_KEY` (hex-encoded, 128/192/256 bits).
    - Must be identical for the server and clients to decrypt each other’s traffic.
 
-2. **Server Ports**  
-   - **server_GCM**: default UDP port **9999**.  
+2. **Server Ports**
+
+   - **server_GCM**: default UDP port **9999**.
    - **server_CTR**: default UDP port **9998**.
 
-3. **No Integrity in CTR**  
-   - AES-CTR does not detect tampering.  
+3. **No Integrity in CTR**
+
+   - AES-CTR does not detect tampering.
    - AES-GCM includes an authentication tag for integrity checks.
 
-4. **UDP Protocol**  
+4. **UDP Protocol**
    - Communication uses UDP. Packet loss or reordering could occur in real-world scenarios.
 
 ---
